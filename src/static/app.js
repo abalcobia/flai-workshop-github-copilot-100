@@ -20,10 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        const participantsHTML = details.participants.length > 0
-          ? `<ul class="participants-list">${details.participants.map(p => `<li><span class="participant-icon">&#128100;</span>${p}</li>`).join("")}</ul>`
-          : `<p class="no-participants">No participants yet — be the first!</p>`;
-
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
@@ -31,9 +27,38 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Availability:</strong> <span class="spots-badge ${spotsLeft === 0 ? 'spots-full' : spotsLeft <= 3 ? 'spots-low' : 'spots-ok'}">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span></p>
           <details class="participants-section">
             <summary><strong>Participants</strong> <span class="participant-count">${details.participants.length} / ${details.max_participants}</span></summary>
-            ${participantsHTML}
+            ${details.participants.length === 0 ? '<p class="no-participants">No participants yet — be the first!</p>' : ''}
           </details>
         `;
+
+        if (details.participants.length > 0) {
+          const detailsEl = activityCard.querySelector(".participants-section");
+          const ul = document.createElement("ul");
+          ul.className = "participants-list";
+          details.participants.forEach(p => {
+            const li = document.createElement("li");
+
+            const icon = document.createElement("span");
+            icon.className = "participant-icon";
+            icon.textContent = "\u{1F464}";
+
+            const emailSpan = document.createElement("span");
+            emailSpan.className = "participant-email";
+            emailSpan.textContent = p;
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "delete-participant-btn";
+            deleteBtn.innerHTML = "&#128465;";
+            deleteBtn.title = `Unregister ${p}`;
+            deleteBtn.addEventListener("click", () => unregisterParticipant(name, p));
+
+            li.appendChild(icon);
+            li.appendChild(emailSpan);
+            li.appendChild(deleteBtn);
+            ul.appendChild(li);
+          });
+          detailsEl.appendChild(ul);
+        }
 
         activitiesList.appendChild(activityCard);
 
@@ -46,6 +71,25 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
+    }
+  }
+
+  // Unregister a participant from an activity
+  async function unregisterParticipant(activityName, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/signup?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        fetchActivities();
+      } else {
+        alert(result.detail || "Failed to unregister participant.");
+      }
+    } catch (error) {
+      console.error("Error unregistering participant:", error);
+      alert("Failed to unregister participant.");
     }
   }
 
@@ -70,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
